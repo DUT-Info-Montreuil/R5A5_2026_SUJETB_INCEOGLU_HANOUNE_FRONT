@@ -1,29 +1,21 @@
-# Contrat API attendu par le front (à valider avec le back)
+# Contrat API
 
-Le back n'expose pour l'instant que `GET /health`. Voici ce que le front appelle déjà.
-Si le back choisit d'autres noms, il suffit de modifier les fichiers `api.ts` / `types.ts` correspondants.
+La référence, c'est le **back** (`R5A5_2026_SUJETB_INCEOGLU_HANOUNE_BACK`), pas ce fichier.
 
-Auth : JWT dans le header `Authorization: Bearer <token>`.
-Erreurs : `{ "message": "..." }` avec le bon code HTTP (401, 403, 404, 409…).
+- Swagger : http://localhost:3000/api-docs (back lancé avec `npm run dev`)
+- Routes : `src/routes/*.routes.ts` du repo back
+- Types : `src/models/types.ts` du repo back
 
-| Méthode | Route | Corps | Réponse |
-|---|---|---|---|
-| GET | `/health` | — | `{ status: "ok" }` ✅ existe |
-| POST | `/auth/register` | `{ pseudo, email, password }` | `{ token, user }` |
-| POST | `/auth/login` | `{ email, password }` | `{ token, user }` |
-| GET | `/auth/me` | — (token) | `user` |
-| GET | `/tournaments?search=` | — | `Tournament[]` (public, B-02) |
-| GET | `/tournaments/:id` | — | `Tournament` (public) |
+Les `types.ts` du front (`src/features/*/types.ts`) recopient ces formes à l'identique.
+Si un champ ou une route manque, on le signale à l'équipe back au lieu de le simuler côté front.
 
-```ts
-type User = { id: string; pseudo: string; email: string; role: 'ADMIN' | 'PLAYER' }
+## Rappels utiles
 
-type Tournament = {
-  id: string
-  name: string
-  game: string
-  status: 'REGISTRATION_OPEN' | 'REGISTRATION_CLOSED' | 'IN_PROGRESS' | 'FINISHED'
-  teamCount: number
-  createdAt: string // ISO
-}
-```
+- Routes sous `/api` : `/api/auth`, `/api/tournois`, `/api/equipes`, `/api/matchs`.
+  Seule exception : `GET /health` (le proxy Vite relaie `/api/health` vers `/health`).
+  Ce relais n'existe qu'en `npm run dev` : hors du serveur de dev, l'indicateur « API en ligne »
+  ne fonctionne pas tant que le back n'expose pas aussi `/api/health` (à demander au back).
+- Auth : JWT dans `Authorization: Bearer <token>`.
+  `POST /api/auth/register` renvoie l'utilisateur **sans token** : le front enchaîne un `POST /api/auth/login`.
+- Erreurs : `{ "message": "..." }` en français, avec le code HTTP (400, 401, 403, 404, 409).
+- Ids numériques, champs et valeurs en français (`nom`, `jeu`, `etat`, `inscriptions_ouvertes`, `administrateur`…).

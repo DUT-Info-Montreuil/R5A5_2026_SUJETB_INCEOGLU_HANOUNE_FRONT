@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ErrorMessage, Loader } from '@/shared/ui/Feedback'
-import { useTournaments } from './hooks'
+import { useTournois } from './hooks'
 import { StatusBadge } from './StatusBadge'
 
 export function TournamentListPage() {
@@ -14,7 +14,7 @@ export function TournamentListPage() {
     return () => clearTimeout(t)
   }, [input])
 
-  const { data, isLoading, isError, error } = useTournaments(search)
+  const { data, isLoading, isError, error } = useTournois(search)
 
   return (
     <div>
@@ -33,12 +33,10 @@ export function TournamentListPage() {
           <li key={t.id}>
             <Link to={`/tournois/${t.id}`} className="block rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-indigo-400">
               <div className="mb-2 flex items-start justify-between gap-2">
-                <h2 className="font-semibold">{t.name}</h2>
-                <StatusBadge status={t.status} />
+                <h2 className="font-semibold">{t.nom}</h2>
+                <StatusBadge etat={t.etat} />
               </div>
-              <p className="text-sm text-slate-400">
-                {t.game} · {t.teamCount}/8 équipes
-              </p>
+              <p className="text-sm text-slate-400">{t.jeu}</p>
             </Link>
           </li>
         ))}

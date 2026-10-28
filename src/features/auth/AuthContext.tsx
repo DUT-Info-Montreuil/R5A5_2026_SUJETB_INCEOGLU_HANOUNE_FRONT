@@ -24,7 +24,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     authApi
       .me()
       .then(setUser)
-      .catch(() => tokenStorage.clear())
+      // Token invalide (401) : apiFetch l'a déjà oublié. Back injoignable : on garde le token pour plus tard.
+      .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
 

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '@/shared/api/client'
 
-// Seule route existante côté back pour l'instant : sert à vérifier que front et back se parlent.
+// Sert à vérifier que front et back se parlent (/api/health est relayé vers /health du back, cf. vite.config.ts).
 export function ApiStatus() {
   const { isSuccess, isError } = useQuery({
     queryKey: ['health'],

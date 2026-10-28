@@ -16,13 +16,13 @@ export function Layout() {
           <nav className="flex gap-4">
             <NavLink to="/" end className={navCls}>Tournois</NavLink>
             {user && <NavLink to="/mes-equipes" className={navCls}>Mes équipes</NavLink>}
-            {user?.role === 'ADMIN' && <NavLink to="/admin" className={navCls}>Admin</NavLink>}
+            {user?.role === 'administrateur' && <NavLink to="/admin" className={navCls}>Admin</NavLink>}
           </nav>
           <div className="ml-auto flex items-center gap-4">
             <ApiStatus />
             {user ? (
               <>
-                <span className="text-sm text-slate-300">{user.pseudo}</span>
+                <span className="text-sm text-slate-300">{user.nom}</span>
                 <button onClick={signOut} className="text-sm text-slate-400 hover:text-slate-200">Déconnexion</button>
               </>
             ) : (

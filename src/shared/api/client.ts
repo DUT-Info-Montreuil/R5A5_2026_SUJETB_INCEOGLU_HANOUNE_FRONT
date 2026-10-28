@@ -41,6 +41,8 @@ export async function apiFetch<T>(path: string, { method = 'GET', body, signal }
 
   if (!res.ok) {
     const data = await res.json().catch(() => null)
+    // En dev, le proxy Vite répond 502 (corps vide) quand le back est éteint : même cas que « injoignable ».
+    if (!data && res.status >= 502 && res.status <= 504) throw new ApiError(0, 'Serveur injoignable')
     throw new ApiError(res.status, data?.message ?? data?.error ?? `Erreur ${res.status}`)
   }
 
