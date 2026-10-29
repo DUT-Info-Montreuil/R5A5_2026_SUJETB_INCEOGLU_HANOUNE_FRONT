@@ -12,6 +12,13 @@ export class ApiError extends Error {
   }
 }
 
+// Prévenu quand le back rejette le token en cours de session (expiré, secret changé…).
+// AuthProvider s'y abonne pour repasser l'interface en mode déconnecté.
+let onUnauthorized: (() => void) | null = null
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler
+}
+
 type Options = {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
   body?: unknown
@@ -36,8 +43,13 @@ export async function apiFetch<T>(path: string, { method = 'GET', body, signal }
     throw new ApiError(0, 'Serveur injoignable')
   }
 
-  // Token expiré ou invalide : on l'oublie, l'UI repassera en mode visiteur.
-  if (res.status === 401) tokenStorage.clear()
+  // Token expiré ou invalide : on l'oublie et on prévient l'UI, qui repasse en mode visiteur.
+  // Sans token envoyé (ex. mauvais mot de passe au login), un 401 ne déconnecte personne.
+  // Si le token a changé entre-temps (reconnexion), ce 401 concerne l'ancienne session : on l'ignore.
+  if (res.status === 401 && token && tokenStorage.get() === token) {
+    tokenStorage.clear()
+    onUnauthorized?.()
+  }
 
   if (!res.ok) {
     const data = await res.json().catch(() => null)

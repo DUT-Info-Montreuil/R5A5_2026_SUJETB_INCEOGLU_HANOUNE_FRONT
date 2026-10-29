@@ -1,12 +1,21 @@
 import { Link, useParams } from 'react-router-dom'
 import { ErrorMessage, Loader } from '@/shared/ui/Feedback'
-import type { Match } from '@/features/matchs/types'
-import { useEquipesDuTournoi, useMatchsDuTournoi, useTournoi } from './hooks'
+import { useAuth } from '@/features/auth/AuthContext'
+import { CreerEquipeForm } from '@/features/equipes/CreerEquipeForm'
+import { DemanderRejoindre } from '@/features/equipes/DemanderRejoindre'
+import { AdminTournoiActions } from './AdminTournoiActions'
+import { ArbreTournoi } from './ArbreTournoi'
+import { useEquipesDuTournoi, useTournoi } from './hooks'
+import { useSuivreTournoi } from './realtime'
 import { StatusBadge } from './StatusBadge'
+import type { Tournoi } from './types'
 
 export function TournamentDetailPage() {
   const id = Number(useParams().id)
   const { data: t, isLoading, isError, error } = useTournoi(id)
+  const { user } = useAuth()
+  // B-19 : état, équipes et arbre se mettent à jour sans recharger tant que la page est ouverte.
+  useSuivreTournoi(id)
 
   if (isLoading) return <Loader />
   if (isError) return <ErrorMessage error={error} />
@@ -21,18 +30,37 @@ export function TournamentDetailPage() {
       </div>
       <p className="mb-8 text-slate-400">Jeu : {t.jeu}</p>
 
-      <EquipesSection tournoiId={t.id} />
-      <MatchsSection tournoiId={t.id} />
+      {user?.role === 'administrateur' && <AdminTournoiActions tournoi={t} />}
+      <EquipesSection tournoi={t} />
+      <ArbreTournoi tournoi={t} />
     </div>
   )
 }
 
-function EquipesSection({ tournoiId }: { tournoiId: number }) {
-  const { data, isLoading, isError, error } = useEquipesDuTournoi(tournoiId)
+// Confort uniquement : ces limites sont vérifiées par le back (B-08, B-12).
+const NOMBRE_EQUIPES_MAX = 8
+const EFFECTIF_MAX = 5
+
+function EquipesSection({ tournoi }: { tournoi: Tournoi }) {
+  const { data, isLoading, isError, error } = useEquipesDuTournoi(tournoi.id)
+  const { user } = useAuth()
+
+  const ouvertes = tournoi.etat === 'inscriptions_ouvertes'
+  // Déjà engagé sur ce tournoi (B-07) : inutile de proposer de créer ou rejoindre. Le back le refuserait.
+  const monEquipe = user ? data?.find((e) => e.membres.some((m) => m.userId === user.id)) : undefined
+  const peutSEngager = ouvertes && !!user && !!data && !monEquipe
+  // B-12 : au-delà de 8 équipes le back refuse la création (409) ; on ne propose pas le formulaire.
+  const complet = !!data && data.length >= NOMBRE_EQUIPES_MAX
 
   return (
     <section className="mb-10">
       <h2 className="mb-4 text-xl font-semibold">Équipes {data && `(${data.length})`}</h2>
+      {ouvertes && !user && (
+        <p className="mb-4 text-sm text-slate-400">
+          <Link to="/connexion" className="text-indigo-300 hover:underline">Connectez-vous</Link> pour créer ou rejoindre une équipe.
+        </p>
+      )}
+      {peutSEngager && !complet && <CreerEquipeForm tournoiId={tournoi.id} />}
       {isLoading && <Loader />}
       {isError && <ErrorMessage error={error} />}
       {data && data.length === 0 && <p className="text-slate-400">Aucune équipe inscrite.</p>}
@@ -40,8 +68,9 @@ function EquipesSection({ tournoiId }: { tournoiId: number }) {
         {data?.map((e) => (
           <li key={e.id} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="font-semibold">{e.nom}</h3>
+              <Link to={`/equipes/${e.id}`} className="font-semibold hover:text-indigo-300">{e.nom}</Link>
               {e.eliminee && <span className="text-xs text-red-300">Éliminée</span>}
+              {e.id === monEquipe?.id && <span className="text-xs text-emerald-300">Votre équipe</span>}
             </div>
             {e.membres.length === 0 ? (
               <p className="text-sm text-slate-500">Aucun membre.</p>
@@ -56,67 +85,10 @@ function EquipesSection({ tournoiId }: { tournoiId: number }) {
                 ))}
               </ul>
             )}
+            {peutSEngager && e.membres.length < EFFECTIF_MAX && <DemanderRejoindre equipeId={e.id} />}
           </li>
         ))}
       </ul>
-    </section>
-  )
-}
-
-// Nom lisible d'un tour, en partant de la finale (dernier tour).
-function nomDuTour(round: number, dernierRound: number) {
-  const ecart = dernierRound - round
-  if (ecart === 0) return 'Finale'
-  if (ecart === 1) return 'Demi-finales'
-  if (ecart === 2) return 'Quarts de finale'
-  return `Tour ${round}`
-}
-
-function MatchsSection({ tournoiId }: { tournoiId: number }) {
-  const matchs = useMatchsDuTournoi(tournoiId)
-  // Les noms d'équipes viennent de la même requête (cache partagé avec EquipesSection).
-  const equipes = useEquipesDuTournoi(tournoiId)
-
-  const nomEquipe = (equipeId: number | null) =>
-    equipeId === null ? 'À déterminer' : (equipes.data?.find((e) => e.id === equipeId)?.nom ?? `Équipe #${equipeId}`)
-
-  const parTour = new Map<number, Match[]>()
-  for (const m of [...(matchs.data ?? [])].sort((a, b) => a.round - b.round || a.position - b.position)) {
-    parTour.set(m.round, [...(parTour.get(m.round) ?? []), m])
-  }
-  const dernierRound = Math.max(0, ...parTour.keys())
-
-  return (
-    <section>
-      <h2 className="mb-4 text-xl font-semibold">Matchs</h2>
-      {matchs.isLoading && <Loader />}
-      {matchs.isError && <ErrorMessage error={matchs.error} />}
-      {matchs.data && matchs.data.length === 0 && (
-        <p className="text-slate-400">Aucun match : l'arbre est généré à la clôture des inscriptions.</p>
-      )}
-      <div className="space-y-6">
-        {[...parTour].map(([round, liste]) => (
-          <div key={round}>
-            <h3 className="mb-2 font-medium text-slate-300">{nomDuTour(round, dernierRound)}</h3>
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {liste.map((m) => (
-                <li key={m.id} className="rounded-md border border-slate-800 bg-slate-900 px-3 py-2 text-sm">
-                  {[m.equipe1Id, m.equipe2Id].map((equipeId, i) => {
-                    const gagnant = m.vainqueurId !== null && m.vainqueurId === equipeId
-                    const cls = gagnant ? 'font-semibold text-emerald-300' : equipeId === null ? 'text-slate-500' : ''
-                    return (
-                      <div key={i} className={cls}>
-                        {nomEquipe(equipeId)}
-                        {gagnant && ' ✓'}
-                      </div>
-                    )
-                  })}
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
     </section>
   )
 }
