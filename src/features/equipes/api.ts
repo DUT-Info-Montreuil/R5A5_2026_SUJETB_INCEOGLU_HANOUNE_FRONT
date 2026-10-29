@@ -1,5 +1,5 @@
 import { apiFetch } from '@/shared/api/client'
-import type { DemandeAdhesion, DemandeRecue, Equipe, MaDemande } from './types'
+import type { DemandeAdhesion, DemandeRecue, Equipe, MaDemande, Message, MonEquipe } from './types'
 
 export const equipesApi = {
   get: (id: number) => apiFetch<Equipe>(`/equipes/${id}`),
@@ -22,4 +22,10 @@ export const equipesApi = {
   annulerDemande: (id: number, demandeId: number) =>
     apiFetch<void>(`/equipes/${id}/demandes/${demandeId}`, { method: 'DELETE' }),
   mesDemandes: () => apiFetch<MaDemande[]>('/auth/me/demandes'),
+  mesEquipes: () => apiFetch<MonEquipe[]>('/auth/me/equipes'),
+
+  // Espace d'échange (B-16 à B-18) : membres, ou administrateur (lecture seule, même après élimination).
+  messages: (id: number) => apiFetch<Message[]>(`/equipes/${id}/messages`),
+  envoyerMessage: (id: number, contenu: string) =>
+    apiFetch<Message>(`/equipes/${id}/messages`, { method: 'POST', body: { contenu } }),
 }

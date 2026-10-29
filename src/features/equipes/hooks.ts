@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tournoiKeys } from '@/features/tournaments/hooks'
 import { equipesApi } from './api'
 import { equipeKeys } from './keys'
+import type { Message } from './types'
 
 export function useEquipe(id: number) {
   return useQuery({ queryKey: equipeKeys.detail(id), queryFn: () => equipesApi.get(id) })
@@ -16,6 +17,31 @@ export function useMesDemandes() {
   return useQuery({ queryKey: equipeKeys.mesDemandes, queryFn: equipesApi.mesDemandes })
 }
 
+export function useMesEquipes() {
+  return useQuery({ queryKey: equipeKeys.mesEquipes, queryFn: equipesApi.mesEquipes })
+}
+
+// Membres, ou administrateur. Le back refuse (403 non membre, 409 équipe éliminée) : l'écran affiche son message.
+export function useMessages(equipeId: number) {
+  return useQuery({ queryKey: equipeKeys.messages(equipeId), queryFn: () => equipesApi.messages(equipeId), retry: false })
+}
+
+// Ajoute un message à l'historique en cache, sans doublon : l'auteur le reçoit
+// à la fois dans la réponse du POST et par message:nouveau.
+export function ajouterMessage<T extends Message>(liste: T[] | undefined, message: T) {
+  if (!liste || liste.some((m) => m.id === message.id)) return liste
+  return [...liste, message]
+}
+
+export function useEnvoyerMessage(equipeId: number) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (contenu: string) => equipesApi.envoyerMessage(equipeId, contenu),
+    onSuccess: (message) =>
+      queryClient.setQueryData<Message[]>(equipeKeys.messages(equipeId), (liste) => ajouterMessage(liste, message)),
+  })
+}
+
 // Une équipe a changé : sa fiche, ses demandes et la liste des équipes de son tournoi sont à recharger.
 function useInvaliderEquipe() {
   const queryClient = useQueryClient()
@@ -23,6 +49,7 @@ function useInvaliderEquipe() {
     Promise.all([
       queryClient.invalidateQueries({ queryKey: equipeKeys.detail(equipeId) }),
       queryClient.invalidateQueries({ queryKey: tournoiKeys.equipes(tournoiId) }),
+      queryClient.invalidateQueries({ queryKey: equipeKeys.mesEquipes }),
     ])
 }
 
@@ -35,6 +62,7 @@ export function useCreerEquipe(tournoiId: number) {
         queryClient.invalidateQueries({ queryKey: tournoiKeys.equipes(tournoiId) }),
         // Le back annule mes demandes en attente sur ce tournoi (B-07).
         queryClient.invalidateQueries({ queryKey: equipeKeys.mesDemandes }),
+        queryClient.invalidateQueries({ queryKey: equipeKeys.mesEquipes }),
       ]),
   })
 }

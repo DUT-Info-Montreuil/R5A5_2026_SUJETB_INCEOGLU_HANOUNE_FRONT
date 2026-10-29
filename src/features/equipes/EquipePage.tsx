@@ -3,11 +3,14 @@ import { Link, useParams } from 'react-router-dom'
 import type { UseMutationResult } from '@tanstack/react-query'
 import { useAuth } from '@/features/auth/AuthContext'
 import { useTournoi } from '@/features/tournaments/hooks'
+import { useSuivreTournoi } from '@/features/tournaments/realtime'
 import { StatusBadge } from '@/features/tournaments/StatusBadge'
+import { useSocketEvent } from '@/shared/realtime/socket'
 import { ErrorMessage, Loader } from '@/shared/ui/Feedback'
 import { btnDanger, btnPrimary, btnSecondary, inputCls } from '@/shared/ui/styles'
+import { EspaceEchange } from './EspaceEchange'
 import { useActionsEquipe, useDemandesRecues, useEquipe } from './hooks'
-import type { Equipe, MembreEquipe } from './types'
+import type { DemandeAdhesion, Equipe, ExclusionEquipe, MembreEquipe } from './types'
 
 export function EquipePage() {
   const id = Number(useParams().id)
@@ -25,9 +28,23 @@ function EquipeDetail({ equipe }: { equipe: Equipe }) {
   const { user } = useAuth()
   const tournoi = useTournoi(equipe.tournoiId)
   const actions = useActionsEquipe(equipe.id, equipe.tournoiId)
+  // equipe:maj et tournoi:maj sont diffusés dans la room du tournoi : la fiche suit sans recharger (B-19).
+  useSuivreTournoi(equipe.tournoiId)
 
   const estMembre = !!user && equipe.membres.some((m) => m.userId === user.id)
   const estCapitaine = user?.id === equipe.capitaineId
+  const estAdmin = user?.role === 'administrateur'
+
+  // B-17 : exclu (ou parti) pendant que la page est ouverte. L'espace disparaît tout de suite,
+  // sans attendre le rechargement de l'équipe ; c'est le back qui coupe réellement l'accès.
+  // Redevenir membre passe par une demande acceptée (demande:maj) : l'exclusion est alors levée.
+  const [exclusion, setExclusion] = useState<ExclusionEquipe['motif'] | null>(null)
+  useSocketEvent<ExclusionEquipe>('equipe:exclu', (e) => {
+    if (e.equipeId === equipe.id) setExclusion(e.motif)
+  })
+  useSocketEvent<DemandeAdhesion>('demande:maj', (d) => {
+    if (d.equipeId === equipe.id && d.statut === 'acceptee') setExclusion(null)
+  })
   // B-11 : passé les inscriptions, la composition est figée. Tant que l'état n'est pas connu, on n'affiche rien.
   const ouvertes = tournoi.data?.etat === 'inscriptions_ouvertes'
   const gerer = estCapitaine && ouvertes
@@ -61,6 +78,14 @@ function EquipeDetail({ equipe }: { equipe: Equipe }) {
 
       {erreur && <div className="mb-4"><ErrorMessage error={erreur} /></div>}
 
+      {exclusion && (
+        <p className="mb-6 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
+          {exclusion === 'exclusion'
+            ? "Vous avez été exclu de l'équipe : vous n'avez plus accès à son espace d'échange."
+            : "Vous avez quitté l'équipe : vous n'avez plus accès à son espace d'échange."}
+        </p>
+      )}
+
       {gerer && <RenommerForm key={equipe.nom} equipe={equipe} onRenommer={(nom) => lancer(actions.renommer, nom)} pending={actions.renommer.isPending} />}
 
       {gerer && <DemandesSection equipeId={equipe.id} actions={actions} lancer={lancer} />}
@@ -77,6 +102,8 @@ function EquipeDetail({ equipe }: { equipe: Equipe }) {
           </ul>
         )}
       </section>
+
+      {!exclusion && (estMembre || estAdmin) && <EspaceEchange equipe={equipe} estMembre={estMembre} estAdmin={estAdmin} />}
 
       {estMembre && tournoi.data && !ouvertes && (
         <p className="mb-6 text-sm text-slate-400">Inscriptions closes : la composition de l'équipe est figée.</p>
