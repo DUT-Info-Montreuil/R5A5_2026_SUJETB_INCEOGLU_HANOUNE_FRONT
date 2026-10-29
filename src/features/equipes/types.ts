@@ -13,3 +13,20 @@ export type Equipe = {
   eliminee: boolean
   membres: MembreEquipe[]
 }
+
+// Demande d'adhésion (B-06).
+export type StatutDemande = 'en_attente' | 'acceptee' | 'refusee' | 'annulee'
+
+export type DemandeAdhesion = {
+  id: number
+  equipeId: number
+  userId: number
+  statut: StatutDemande
+  createdAt: string
+}
+
+// GET /api/equipes/:id/demandes (capitaine) : le back ajoute le nom du joueur.
+export type DemandeRecue = DemandeAdhesion & { nomJoueur: string | null }
+
+// GET /api/auth/me/demandes : le back ajoute le nom et le tournoi de l'équipe visée.
+export type MaDemande = DemandeAdhesion & { nomEquipe: string | null; tournoiId: number | null }

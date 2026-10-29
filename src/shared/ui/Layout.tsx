@@ -6,7 +6,7 @@ const navCls = ({ isActive }: { isActive: boolean }) =>
   `text-sm ${isActive ? 'text-white' : 'text-slate-400 hover:text-slate-200'}`
 
 export function Layout() {
-  const { user, signOut } = useAuth()
+  const { user, sessionExpiree, signOut } = useAuth()
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -32,6 +32,11 @@ export function Layout() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">
+        {sessionExpiree && !user && (
+          <p className="mb-6 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+            Votre session a expiré. <Link to="/connexion" className="underline">Reconnectez-vous</Link> pour continuer.
+          </p>
+        )}
         <Outlet />
       </main>
     </div>
