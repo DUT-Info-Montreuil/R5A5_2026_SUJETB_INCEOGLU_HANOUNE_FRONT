@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { equipeKeys } from '@/features/equipes/keys'
 import { tournoisApi } from './api'
 
 // Clés de cache centralisées : le temps réel (Socket.io) viendra invalider ces clés
@@ -25,4 +26,26 @@ export function useEquipesDuTournoi(id: number) {
 
 export function useMatchsDuTournoi(id: number) {
   return useQuery({ queryKey: tournoiKeys.matchs(id), queryFn: () => tournoisApi.matchs(id) })
+}
+
+export function useCreerTournoi() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ nom, jeu }: { nom: string; jeu: string }) => tournoisApi.creer(nom, jeu),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: tournoiKeys.all }),
+  })
+}
+
+// Clôture et lancement changent l'état, l'arbre et (forfaits du lancement) les équipes éliminées.
+export function useChangerEtatTournoi(id: number) {
+  const queryClient = useQueryClient()
+  const onSuccess = () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: tournoiKeys.all }),
+      queryClient.invalidateQueries({ queryKey: equipeKeys.all }),
+    ])
+  return {
+    cloturer: useMutation({ mutationFn: () => tournoisApi.cloturer(id), onSuccess }),
+    lancer: useMutation({ mutationFn: () => tournoisApi.lancer(id), onSuccess }),
+  }
 }

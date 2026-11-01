@@ -26,6 +26,12 @@ export default defineConfig({
         target: BACK_URL,
         changeOrigin: true,
       },
+      // Socket.io partage le serveur HTTP du back : on relaie aussi les WebSockets.
+      '/socket.io': {
+        target: BACK_URL,
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })
