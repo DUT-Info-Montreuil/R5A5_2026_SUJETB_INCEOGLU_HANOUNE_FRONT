@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { tournoiKeys } from '@/features/tournaments/hooks'
 import { equipesApi } from './api'
 import { equipeKeys } from './keys'
-import type { Message } from './types'
+import type { MessageAvecAuteur } from './types'
 
 export function useEquipe(id: number) {
   return useQuery({ queryKey: equipeKeys.detail(id), queryFn: () => equipesApi.get(id) })
@@ -26,9 +26,9 @@ export function useMessages(equipeId: number) {
   return useQuery({ queryKey: equipeKeys.messages(equipeId), queryFn: () => equipesApi.messages(equipeId), retry: false })
 }
 
-// Ajoute un message à l'historique en cache, sans doublon : l'auteur le reçoit
-// à la fois dans la réponse du POST et par message:nouveau.
-export function ajouterMessage<T extends Message>(liste: T[] | undefined, message: T) {
+// Ajoute un message reçu en direct à l'historique en cache, sans doublon
+// (il peut déjà y être si l'historique a été relu entre-temps).
+export function ajouterMessage(liste: MessageAvecAuteur[] | undefined, message: MessageAvecAuteur) {
   if (!liste || liste.some((m) => m.id === message.id)) return liste
   return [...liste, message]
 }
@@ -37,8 +37,15 @@ export function useEnvoyerMessage(equipeId: number) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (contenu: string) => equipesApi.envoyerMessage(equipeId, contenu),
-    onSuccess: (message) =>
-      queryClient.setQueryData<Message[]>(equipeKeys.messages(equipeId), (liste) => ajouterMessage(liste, message)),
+    // La réponse du POST n'a pas le nom de l'auteur, et on ne le déduit pas de l'utilisateur connecté
+    // (le token peut appartenir à un autre compte, cf. autre onglet). Le message arrive en général
+    // déjà par message:nouveau ; sinon (room refusée), on relit l'historique, qui porte nomAuteur.
+    // Relire à chaque envoi pourrait écraser un message:nouveau arrivé pendant la relecture.
+    onSuccess: (message) => {
+      const liste = queryClient.getQueryData<MessageAvecAuteur[]>(equipeKeys.messages(equipeId))
+      if (liste?.some((m) => m.id === message.id)) return
+      return queryClient.invalidateQueries({ queryKey: equipeKeys.messages(equipeId) })
+    },
   })
 }
 
@@ -94,6 +101,7 @@ export function useAnnulerDemande() {
 
 // Actions sur une équipe existante (membre ou capitaine). Toutes rechargent l'équipe après succès.
 export function useActionsEquipe(equipeId: number, tournoiId: number) {
+  const queryClient = useQueryClient()
   const invalider = useInvaliderEquipe()
   const onSuccess = () => invalider(equipeId, tournoiId)
   return {
@@ -106,7 +114,17 @@ export function useActionsEquipe(equipeId: number, tournoiId: number) {
     retirerMembre: useMutation({ mutationFn: (userId: number) => equipesApi.retirerMembre(equipeId, userId), onSuccess }),
     passerCapitaine: useMutation({
       mutationFn: (userId: number) => equipesApi.passerCapitaine(equipeId, userId),
-      onSuccess,
+      // Le back renvoie l'équipe à jour : on l'écrit telle quelle, ce qui retire tout de suite les boutons
+      // de capitaine. Pas de relecture de detail(id) : elle relirait aussi les demandes, refusées (403)
+      // à l'ancien capitaine. Les demandes sont oubliées, le nouveau capitaine les chargera.
+      onSuccess: (equipe) => {
+        queryClient.setQueryData(equipeKeys.detail(equipeId), equipe)
+        queryClient.removeQueries({ queryKey: equipeKeys.demandes(equipeId), exact: true })
+        return Promise.all([
+          queryClient.invalidateQueries({ queryKey: tournoiKeys.equipes(tournoiId) }),
+          queryClient.invalidateQueries({ queryKey: equipeKeys.mesEquipes }),
+        ])
+      },
     }),
     decider: useMutation({
       mutationFn: ({ demandeId, decision }: { demandeId: number; decision: 'acceptee' | 'refusee' }) =>

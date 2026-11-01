@@ -36,7 +36,7 @@ export type MaDemande = DemandeAdhesion & { nomEquipe: string | null; tournoiId:
 // GET /api/auth/me/equipes : le back ajoute le nom et l'état du tournoi.
 export type MonEquipe = Equipe & { nomTournoi: string | null; etatTournoi: EtatTournoi | null }
 
-// Espace d'échange de l'équipe (B-16).
+// Espace d'échange de l'équipe (B-16). Forme brute : réponse de POST /api/equipes/:id/messages.
 export type Message = {
   id: number
   equipeId: number
@@ -45,8 +45,9 @@ export type Message = {
   createdAt: string
 }
 
-// Événement Socket.io message:nouveau : le back ajoute le nom de l'auteur (absent de la réponse REST).
-export type MessageDiffuse = Message & { nomAuteur: string | null }
+// GET /api/equipes/:id/messages et événement Socket.io message:nouveau : le back ajoute le nom de l'auteur
+// (null si le compte n'existe plus). C'est la seule source du nom affiché.
+export type MessageAvecAuteur = Message & { nomAuteur: string | null }
 
 // Événement Socket.io equipe:exclu, reçu par le joueur exclu ou qui part (B-17).
 export type ExclusionEquipe = { equipeId: number; motif: 'exclusion' | 'depart' }

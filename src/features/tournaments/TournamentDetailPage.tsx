@@ -48,7 +48,8 @@ function EquipesSection({ tournoi }: { tournoi: Tournoi }) {
   const ouvertes = tournoi.etat === 'inscriptions_ouvertes'
   // Déjà engagé sur ce tournoi (B-07) : inutile de proposer de créer ou rejoindre. Le back le refuserait.
   const monEquipe = user ? data?.find((e) => e.membres.some((m) => m.userId === user.id)) : undefined
-  const peutSEngager = ouvertes && !!user && !!data && !monEquipe
+  // Un administrateur arbitre, il ne joue pas : ni création ni demande (le back répond 403).
+  const peutSEngager = ouvertes && user?.role === 'joueur' && !!data && !monEquipe
   // B-12 : au-delà de 8 équipes le back refuse la création (409) ; on ne propose pas le formulaire.
   const complet = !!data && data.length >= NOMBRE_EQUIPES_MAX
 

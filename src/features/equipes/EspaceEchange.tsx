@@ -6,7 +6,7 @@ import { ErrorMessage, Loader } from '@/shared/ui/Feedback'
 import { btnPrimary, inputCls } from '@/shared/ui/styles'
 import { useEnvoyerMessage, useMessages } from './hooks'
 import { equipeKeys } from './keys'
-import type { Equipe, Message, MessageDiffuse } from './types'
+import type { Equipe, MessageAvecAuteur } from './types'
 
 type Props = { equipe: Equipe; estMembre: boolean; estAdmin: boolean }
 
@@ -52,11 +52,9 @@ function Fil({ equipe, peutEcrire }: { equipe: Equipe; peutEcrire: boolean }) {
     if (liste.current) liste.current.scrollTop = liste.current.scrollHeight
   }, [nbMessages])
 
-  // L'historique REST ne donne que userId ; les messages reçus en direct portent aussi nomAuteur.
-  const auteur = (m: Message | MessageDiffuse) =>
-    equipe.membres.find((membre) => membre.userId === m.userId)?.nom ??
-    ('nomAuteur' in m ? m.nomAuteur : null) ??
-    `Joueur #${m.userId}`
+  // Le nom affiché vient TOUJOURS du message (nomAuteur, fourni par le back en REST comme en direct),
+  // jamais de l'utilisateur connecté ni de la composition actuelle (un auteur a pu quitter l'équipe).
+  const auteur = (m: MessageAvecAuteur) => m.nomAuteur ?? `Joueur #${m.userId}`
 
   return (
     <Cadre>
