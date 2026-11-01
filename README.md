@@ -2,6 +2,7 @@
 
 Front React + TypeScript de la plateforme de tournois inter-IUT (sujet B).
 Back associé : [R5A5_2026_SUJETB_INCEOGLU_HANOUNE_BACK](https://github.com/DUT-Info-Montreuil/R5A5_2026_SUJETB_INCEOGLU_HANOUNE_BACK)
+(installation, base de données, comptes de test : voir son [README](https://github.com/DUT-Info-Montreuil/R5A5_2026_SUJETB_INCEOGLU_HANOUNE_BACK#readme)).
 
 ## Prérequis
 
@@ -18,9 +19,11 @@ ni changement de version majeure.
    ```bash
    cd ../R5A5_2026_SUJETB_INCEOGLU_HANOUNE_BACK
    npm install
-   cp .env.example .env   # JWT_SECRET obligatoire, sinon le back refuse de démarrer
+   cp .env.example .env   # valeurs par défaut utilisables telles quelles en local
    npm run dev            # http://localhost:3000, Swagger sur /api-docs
    ```
+   Le `.env` doit exister : sans `JWT_SECRET` (`votre_secret_jwt` dans `.env.example`), le back refuse de démarrer.
+   La base SQLite (`data/tournois.db`) est créée au premier démarrage avec le jeu de démonstration.
 2. **Lancer le front** :
    ```bash
    npm install
@@ -47,26 +50,31 @@ Le voyant « API en ligne » dans le header confirme que le front joint le back.
 
 ## Comptes de test
 
-Données en mémoire du back (`src/models/fakeData.ts`), remises à zéro à chaque redémarrage.
-Mot de passe commun : **`motdepasse`**.
+Recopiés du [README du back](https://github.com/DUT-Info-Montreuil/R5A5_2026_SUJETB_INCEOGLU_HANOUNE_BACK#comptes-de-test).
+Jeu de démonstration stocké en SQLite côté back (`data/tournois.db`) : les données sont **conservées au
+redémarrage** du back. Il n'est inséré que dans une base vide : pour repartir de zéro, arrêter le back,
+supprimer `data/tournois.db` et le relancer.
 
-| Email | Rôle | Situation |
+Mot de passe commun : **`motdepasse`**. Email : `<identifiant>@iut.fr`.
+
+| Compte | Situation | Permet de tester |
 |---|---|---|
-| `admin@iut.fr` | administrateur | — |
-| `zeki@iut.fr` | joueur | capitaine de « Les Montreuillois » (tournoi 1, inscriptions ouvertes) |
-| `hanoune@iut.fr` | joueur | membre de « Les Montreuillois » |
-| `lea@iut.fr` | joueur | capitaine de « Team Paris 8 » (tournoi 1) |
-| `sami@iut.fr` | joueur | sans équipe : pour tester création et demandes |
-| `joueur6@iut.fr` … `joueur45@iut.fr` | joueur | 8 équipes de 5 du tournoi 2 (en cours) ; capitaines : `joueur6`, `joueur11`, `joueur16`… |
+| `admin` | Administrateur : il organise, il ne joue pas | Créer, clore, lancer un tournoi ; saisir résultats et forfaits ; lire l'espace d'une équipe éliminée (B-01, B-03, B-04, B-13, B-15, B-18). Refus (403) de créer une équipe ou de demander à en rejoindre une |
+| `zeki` | Capitaine de *Les Montreuillois* (tournoi 1) | Actions de capitaine : renommer, rôles, exclure, passer la main, traiter les demandes (B-09, B-10) |
+| `hanoune` | Membre simple de *Les Montreuillois* | Refus des actions réservées au capitaine ; quitter l'équipe (B-06, B-10) |
+| `lea` | Capitaine de *Team Paris 8* (tournoi 1) | Refus d'agir sur une équipe dont on n'est pas membre (B-10, B-16) |
+| `sami` | Joueur sans équipe | Créer une équipe, demander à en rejoindre une, une seule équipe par tournoi (B-05, B-06, B-07) |
+| `joueur6` à `joueur45` | 8 équipes de 5 du tournoi 2 (équipe 3 = joueur6 à joueur10, etc.) ; capitaines : joueur6, 11, 16, 21, 26, 31, 36, 41 | Messagerie d'équipe en temps réel, élimination puis fermeture de l'espace (B-16 à B-18) |
+| `joueur46` à `joueur84` | 8 équipes du tournoi 3, rôles de jeu attribués : 7 équipes de 5 (équipe 11 = joueur46 à joueur50, etc.) et *Demo Hotel* (équipe 18) à 4 joueurs, joueur81 à joueur84 ; capitaines : joueur46, 51, 56, 61, 66, 71, 76, 81 | Avec `admin` : clore (arbre généré), lancer (*Demo Hotel* forfait au premier match), saisir les résultats (B-03, B-04, B-12 à B-15) |
 
 ## Écrans et droits
 
 | Écran | Visiteur | Joueur | Capitaine | Admin |
 |---|---|---|---|---|
 | `/` Tournois | liste, recherche par nom ou jeu, état | idem | idem | idem |
-| `/tournois/:id` Détail | état, équipes et membres, arbre | + créer une équipe, demander à rejoindre (inscriptions ouvertes) | idem | + clôturer les inscriptions, lancer le tournoi, saisir vainqueur / forfait (en cours) |
+| `/tournois/:id` Détail | état, équipes et membres, arbre | + créer une équipe, demander à rejoindre (inscriptions ouvertes) | idem | état, équipes, arbre + clôturer les inscriptions, lancer le tournoi, saisir vainqueur / forfait (en cours) ; ni création ni demande (403 du back) |
 | `/equipes/:id` Équipe | membres et rôles | membre : espace d'échange, quitter l'équipe (inscriptions ouvertes) | + renommer, accepter / refuser les demandes, attribuer les rôles, nommer capitaine, exclure | espace d'échange en lecture seule |
-| `/mes-equipes` | — | ses équipes, ses demandes (annuler si en attente) | + nombre de demandes en attente par équipe | idem joueur |
+| `/mes-equipes` | — | ses équipes, ses demandes (annuler si en attente) | + nombre de demandes en attente par équipe | vide : l'admin ne joue pas |
 | `/admin` | — | — | — | créer un tournoi, liste des tournois à gérer |
 | `/connexion`, `/inscription` | connexion, création de compte | — | — | — |
 
@@ -119,8 +127,6 @@ Les gardes de route (`RequireAuth`, `RequireAdmin`) et les boutons masqués sont
   `VITE_BACK_URL=http://... npm run dev`.
 - Le proxy n'existe qu'en dev : un build servi ailleurs doit être servi derrière un reverse proxy vers le back
   (`/api`, `/socket.io`), et le voyant « API en ligne » échoue tant que le back n'expose pas `/api/health`.
-- Données du back en mémoire : tout est perdu au redémarrage du back.
 - Événements diffusés pendant une coupure non rejoués par le back : le front relit les données à chaque
   entrée dans une room.
 - Pas de correction d'un résultat de match ni d'édition / suppression de tournoi (non prévu par le back).
-- Le README du back est en cours de rédaction : en attendant, voir son `CLAUDE.md` et son Swagger.
