@@ -12,18 +12,23 @@ const NOUVEL_ESSAI_MS = 5000
 
 // Branche le client Socket.io partagé sur la session, et ses événements sur le cache.
 export function TempsReel() {
-  const { user, loading } = useAuth()
-  // Lu à chaque rendu : signIn / signOut changent user, donc provoquent un rendu.
-  // Suivre le token (et pas seulement l'id) couvre une reconnexion au même compte.
-  const token = loading ? null : tokenStorage.get()
+  const { user, token, loading } = useAuth()
   const connecte = useRef(user !== null)
+  const chargement = useRef(loading)
   useEffect(() => {
     connecte.current = user !== null
-  }, [user])
+    chargement.current = loading
+  }, [user, loading])
 
-  // Connexion, puis reconnexion à chaque login / logout : le back n'identifie la socket qu'au handshake.
+  // Connexion, puis reconnexion à chaque changement de token (login, logout, autre compte dans un autre onglet) :
+  // le back n'identifie la socket qu'au handshake. Suivre le token (et pas seulement l'utilisateur)
+  // couvre une reconnexion au même compte.
+  // Pendant que /me confirme la session, on coupe : la socket ne doit pas rester sur l'ancien compte.
   useEffect(() => {
-    if (loading) return
+    if (loading) {
+      socket.disconnect()
+      return
+    }
     connecterSocket(token)
   }, [token, loading])
 
@@ -37,7 +42,10 @@ export function TempsReel() {
     const verifierSession = () => {
       authApi.me().catch((err) => {
         if (err instanceof ApiError && err.status === 0) {
-          minuteur = setTimeout(() => connecterSocket(tokenStorage.get()), NOUVEL_ESSAI_MS)
+          // Session en cours de vérification (/me) : l'effet de connexion s'en chargera à la fin.
+          minuteur = setTimeout(() => {
+            if (!chargement.current) connecterSocket(tokenStorage.get())
+          }, NOUVEL_ESSAI_MS)
         } else if (!tokenStorage.get() && !connecte.current) {
           connecterSocket(null)
         }

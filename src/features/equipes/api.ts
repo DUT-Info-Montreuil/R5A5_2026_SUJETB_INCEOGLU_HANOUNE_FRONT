@@ -1,5 +1,5 @@
 import { apiFetch } from '@/shared/api/client'
-import type { DemandeAdhesion, DemandeRecue, Equipe, MaDemande, Message, MonEquipe } from './types'
+import type { DemandeAdhesion, DemandeRecue, Equipe, MaDemande, Message, MessageAvecAuteur, MonEquipe } from './types'
 
 export const equipesApi = {
   get: (id: number) => apiFetch<Equipe>(`/equipes/${id}`),
@@ -25,7 +25,8 @@ export const equipesApi = {
   mesEquipes: () => apiFetch<MonEquipe[]>('/auth/me/equipes'),
 
   // Espace d'échange (B-16 à B-18) : membres, ou administrateur (lecture seule, même après élimination).
-  messages: (id: number) => apiFetch<Message[]>(`/equipes/${id}/messages`),
+  messages: (id: number) => apiFetch<MessageAvecAuteur[]>(`/equipes/${id}/messages`),
+  // Réponse SANS nomAuteur : le message s'affiche via message:nouveau ou la relecture de l'historique.
   envoyerMessage: (id: number, contenu: string) =>
     apiFetch<Message>(`/equipes/${id}/messages`, { method: 'POST', body: { contenu } }),
 }

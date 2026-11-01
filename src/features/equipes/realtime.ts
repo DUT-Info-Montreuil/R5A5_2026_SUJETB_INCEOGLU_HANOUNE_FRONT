@@ -3,7 +3,7 @@ import { tournoiKeys } from '@/features/tournaments/hooks'
 import { useSocketEvent } from '@/shared/realtime/socket'
 import { ajouterMessage } from './hooks'
 import { equipeKeys } from './keys'
-import type { DemandeAdhesion, Equipe, ExclusionEquipe, MessageDiffuse } from './types'
+import type { DemandeAdhesion, Equipe, ExclusionEquipe, MessageAvecAuteur } from './types'
 
 // Événements Socket.io des équipes → cache TanStack Query (voir docs/temps-reel.md du back).
 // Monté une seule fois (app/TempsReel) : un événement n'arrive que si la socket est dans la bonne room.
@@ -11,8 +11,16 @@ export function useTempsReelEquipes() {
   const queryClient = useQueryClient()
 
   // Composition, nom, rôles, capitaine ou élimination : le back envoie l'équipe complète.
+  // La fiche (EquipePage) déduit estCapitaine de capitaineId : après une passation, les boutons
+  // de capitaine apparaissent chez le nouveau et disparaissent chez l'ancien, sans recharger.
   useSocketEvent<Equipe>('equipe:maj', (equipe) => {
+    const avant = queryClient.getQueryData<Equipe>(equipeKeys.detail(equipe.id))
     queryClient.setQueryData(equipeKeys.detail(equipe.id), equipe)
+    // Passation : les demandes reçues ne sont lisibles que par le capitaine. On les oublie sans les relire
+    // (l'ancien capitaine prendrait un 403) ; le nouveau les charge en affichant la section.
+    if (avant && avant.capitaineId !== equipe.capitaineId) {
+      queryClient.removeQueries({ queryKey: equipeKeys.demandes(equipe.id), exact: true })
+    }
     queryClient.setQueryData<Equipe[]>(tournoiKeys.equipes(equipe.tournoiId), (liste) => {
       if (!liste) return liste
       return liste.some((e) => e.id === equipe.id) ? liste.map((e) => (e.id === equipe.id ? equipe : e)) : [...liste, equipe]
@@ -23,8 +31,8 @@ export function useTempsReelEquipes() {
   })
 
   // B-16 : nouveau message dans une équipe dont on a rejoint la room.
-  useSocketEvent<MessageDiffuse>('message:nouveau', (message) => {
-    queryClient.setQueryData<MessageDiffuse[]>(equipeKeys.messages(message.equipeId), (liste) => ajouterMessage(liste, message))
+  useSocketEvent<MessageAvecAuteur>('message:nouveau', (message) => {
+    queryClient.setQueryData<MessageAvecAuteur[]>(equipeKeys.messages(message.equipeId), (liste) => ajouterMessage(liste, message))
   })
 
   // B-17 : exclu ou parti. Le back nous a déjà retiré de la room ; on oublie l'historique.
